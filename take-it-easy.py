@@ -1,3 +1,4 @@
+# %%
 import tensorflow as tf
 from tensorflow.keras.models import Sequential 
 from tensorflow.keras.layers import Dense, Flatten, InputLayer, Conv1D
@@ -14,11 +15,12 @@ from gym.spaces import Box, Discrete
 
 from os.path import exists
 
-print('Imports done')
+import matplotlib.pyplot as plt
+import pandas as pd
 
 rng = np.random.default_rng()
 
-
+# %%
 class TakeItEasyEnv(Env):
     def __init__(self):
         self.action_space = Discrete(20, start=1)
@@ -89,11 +91,14 @@ class TakeItEasyEnv(Env):
         return self.state, reward, done, info
 
 
+# %%
 env=TakeItEasyEnv()
 
 states = env.observation_space.shape
 actions = env.action_space.n
 
+
+# %%
 def build_model(states, actions):
     model = Sequential()
     model.add(InputLayer(input_shape=(1,20,3)))
@@ -102,57 +107,62 @@ def build_model(states, actions):
     model.add(Dense(256, activation='relu'))
     model.add(Flatten())
     model.add(Dense(actions, activation='linear'))
-
-    print('Model built')
     return model
 
 model = build_model(states, actions)
 
+# %%
+model.summary()
+
+# %%
 def build_agent(model, actions):
     memory = SequentialMemory(limit=200000000, window_length=1)
     policy = BoltzmannQPolicy()
-    dqn = DQNAgent(model=model, nb_actions=actions, memory=memory, nb_steps_warmup=100, target_model_update=1e-2, policy=policy)
+    dqn = DQNAgent(model=model, nb_actions=actions, memory=memory, nb_steps_warmup=256, target_model_update=1e-2, batch_size = 128, policy=policy)
     
-    print('Agent built')
     return dqn
 
 dqn = build_agent(model, actions)
 
 dqn.compile(Adam(learning_rate=0.5e-3), metrics=['mae'])
 
+# %%
 def save_highscore(highscore):
     with open('highscore.txt', 'w') as f:
         f.write(str(highscore))
 
 def load_highscore():
-    with open('highscore.txt', 'r') as f:
-        highscore = float(f.read())
-    
+    try:
+        with open('highscore.txt', 'r') as f:
+            highscore = float(f.read())
+    except:
+        highscore = -100
     return highscore
 
-steps = input('How many steps? ')
+steps = 5000
 highest_reward = load_highscore()
 for i in range(int(steps)//3000):
     print('Step: {}'.format(i*3000))
     try:
         dqn.load_weights('dqn_take-it-easy_weights.hdf5')
     except:
-        print('Could not load weights')
+        try:
+            dqn.load_weights('dqn_take-it-easy_weights-BACKUP.hdf5')
+        except:
+            print('Could not load weights')
     
-    train_results = dqn.fit(env, nb_steps=3000, visualize=False, verbose=1)
+    train_results = dqn.fit(env, nb_steps=10000, visualize=False, verbose=1)
 
-    results_reward = np.median(train_results.history['episode_reward'])
-
-    z = np.polyfit(np.arange(len(train_results.history['episode_reward'])), train_results.history['episode_reward'], 1)
-
-    print('Slope: {}'.format(z[0]))
+    results_reward = np.mean(train_results.history['episode_reward'])
     print('Highest reward: {}'.format(highest_reward))
     print('Train reward: {}'.format(results_reward))
 
-    if(results_reward > highest_reward or z[0] > 0):
+    if(results_reward > highest_reward):
         print('Model improved')
         dqn.save_weights('dqn_take-it-easy_weights.hdf5', overwrite=True)
         highest_reward = results_reward
         save_highscore(highest_reward)
     else:
-        print('Model did not improve')   
+        print('Model did not improve')  
+
+
