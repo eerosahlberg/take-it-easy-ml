@@ -102,7 +102,8 @@ actions = env.action_space.n
 def build_model(states, actions):
     model = Sequential()
     model.add(InputLayer(input_shape=(1,20,3)))
-    model.add(Dense(256, activation='relu'))
+    model.add(Dense(512, activation='relu'))
+    model.add(Dense(1024, activation='relu'))
     model.add(Dense(512, activation='relu'))
     model.add(Dense(256, activation='relu'))
     model.add(Flatten())
@@ -124,7 +125,7 @@ def build_agent(model, actions):
 
 dqn = build_agent(model, actions)
 
-dqn.compile(Adam(learning_rate=0.5e-3), metrics=['mae'])
+dqn.compile(Adam(learning_rate=0.75e-3), metrics=['mae'])
 
 # %%
 def save_highscore(highscore):
@@ -139,7 +140,7 @@ def load_highscore():
         highscore = -100
     return highscore
 
-steps = 5000
+steps = input('How many steps? ')
 highest_reward = load_highscore()
 for i in range(int(steps)//3000):
     print('Step: {}'.format(i*3000))
@@ -147,13 +148,15 @@ for i in range(int(steps)//3000):
         dqn.load_weights('dqn_take-it-easy_weights.hdf5')
     except:
         try:
-            dqn.load_weights('dqn_take-it-easy_weights-BACKUP.hdf5')
+            print('Could not load weights, trying backup')
+            #dqn.load_weights('dqn_take-it-easy_weights-BACKUP.hdf5')
         except:
             print('Could not load weights')
     
-    train_results = dqn.fit(env, nb_steps=10000, visualize=False, verbose=1)
+    train_results = dqn.fit(env, nb_steps=3000, visualize=False, verbose=1)
 
     results_reward = np.mean(train_results.history['episode_reward'])
+
     print('Highest reward: {}'.format(highest_reward))
     print('Train reward: {}'.format(results_reward))
 
